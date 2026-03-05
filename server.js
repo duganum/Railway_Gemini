@@ -1,67 +1,73 @@
-// ─────────────────────────────────────────────
-//  FE Exam Tutor — Gemini Optimized Backend
-//  Project: Railway_Gemini
-// ─────────────────────────────────────────────
-
-const express = require("express");
-const cors = require("cors");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+const express = require('express');
+const cors = require('cors');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
+require('dotenv').config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-// 1. Gemini API 설정 (Railway Variables에서 GEMINI_API_KEY를 가져옵니다)
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
 app.use(cors());
 app.use(express.json());
 
-// ── Health Check ─────────────────────────────
-app.get("/", (req, res) => {
-  res.json({ status: "Gemini 1.5 Flash Engine is running ✅" });
-});
+// 1. 환경 변수에서 API 키 로드
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// ── Main Chat Endpoint ────────────────────────
-app.post("/api/chat", async (req, res) => {
-  const { messages, system, model } = req.body;
-
-  if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: "messages array is required" });
-  }
-
-  // Gemini 1.5 Flash를 기본 모델로 사용 (비용 절감 및 자동 캐싱)
-  const selectedModel = "gemini-1.5-flash"; 
-
+app.post('/api/chat', async (req, res) => {
   try {
-    const modelInstance = genAI.getGenerativeModel({ 
-      model: selectedModel,
-      // 이 systemInstruction이 캐싱의 핵심 대상입니다. (나중에 핸드북 삽입 위치)
-      systemInstruction: system || "You are a professional engineering tutor. Use Socratic method.", 
+    const { messages, systemContext } = req.body;
+
+    // 2. Gemini 모델 설정 (Flash 1.5)
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-flash",
+      systemInstruction: systemContext // 시스템 프롬프트를 명령으로 전달
     });
 
-    // 2. 대화 이력 변환 (Claude 형식을 Gemini 형식으로 매핑)
-    const chat = modelInstance.startChat({
-      history: messages.slice(0, -1).map(m => ({
-        role: m.role === "assistant" ? "model" : "user",
-        parts: [{ text: m.content }],
-      })),
+    // 3. 메시지 형식 변환 (Gemini 전용 role 이름으로 변경)
+    // 'assistant' -> 'model', 'user' -> 'user'
+    let contents = messages.map(m => ({
+      role: m.role === 'assistant' ? 'model' : 'user',
+      parts: [{ text: m.content }]
+    }));
+
+    // 4. [중요] 첫 번째 메시지가 'user'인지 확인하고 필터링
+    // Gemini는 무조건 'user'의 질문으로 대화가 시작되어야 합니다.
+    while (contents.length > 0 && contents[0].role !== 'user') {
+      contents.shift();
+    }
+
+    // 5. 마지막 메시지는 현재 질문이므로 history에서 제외하고 prompt로 사용
+    const lastMessage = contents.pop();
+    
+    // 6. 대화 시작
+    const chat = model.startChat({
+      history: contents,
+      generationConfig: {
+        maxOutputTokens: 2048,
+        temperature: 0.7,
+      },
     });
 
-    // 3. 마지막 메시지 전송 및 응답 수신
-    const lastMessage = messages[messages.length - 1].content;
-    const result = await chat.sendMessage(lastMessage);
+    // 7. 응답 생성 및 전송
+    const result = await chat.sendMessage(lastMessage.parts[0].text);
     const response = await result.response;
-    const reply = response.text();
+    const text = response.text();
 
-    res.json({ reply });
+    res.json({ message: text });
 
-  } catch (err) {
-    console.error("Gemini Server error:", err);
-    res.status(500).json({ error: "Internal server error. Check GEMINI_API_KEY." });
+  } catch (error) {
+    console.error("Gemini Server error:", error);
+    res.status(500).json({ 
+      error: "Internal Server Error", 
+      details: error.message 
+    });
   }
 });
 
-// ── Start Server ──────────────────────────────
+// 8. 포트 설정 (Railway 로그에 찍힌 8080 사용)
+const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
   console.log(`✅ Gemini Backend running on port ${PORT}`);
+});
+
+// 9. 루트 접속 확인용 (브라우저 확인용)
+app.get('/', (req, res) => {
+  res.json({ status: "Gemini 1.5 Flash Engine is running ✅" });
 });
