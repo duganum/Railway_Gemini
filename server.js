@@ -16,7 +16,7 @@ app.post('/api/chat', async (req, res) => {
 
     // 2. Gemini 모델 설정 (Flash 1.5)
     const model = genAI.getGenerativeModel({ 
-      model: "models/gemini-1.5-flash",
+      model: "models/gemini-3-flash-preview",
       systemInstruction: systemContext // 시스템 프롬프트를 명령으로 전달
     });
 
@@ -71,4 +71,5 @@ app.listen(PORT, () => {
 app.get('/', (req, res) => {
   res.json({ status: "Gemini 1.5 Flash Engine is running ✅" });
 });
+
 
