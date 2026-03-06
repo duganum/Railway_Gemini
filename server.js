@@ -2,25 +2,20 @@ const express = require("express");
 const cors = require("cors");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { createClient } = require("@supabase/supabase-js");
-const nodemailer = require("nodemailer");
+const { Resend } = require("resend");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
-
-const mailer = nodemailer.createTransport({
-  service: "gmail",
-  auth: { user: "dugan.um@gmail.com", pass: process.env.GMAIL_APP_PASSWORD },
-});
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 app.use(cors());
 app.use(express.json());
 
 app.get("/", (req, res) => res.json({ status: "Gemini Backend v2" }));
 
-// Register device on first launch
 app.post("/api/register", async (req, res) => {
   const { device_id, email, name } = req.body;
   if (!device_id) return res.status(400).json({ error: "device_id required" });
@@ -40,7 +35,6 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// Check license validity
 app.post("/api/check-license", async (req, res) => {
   const { device_id } = req.body;
   if (!device_id) return res.status(400).json({ error: "device_id required" });
@@ -57,15 +51,14 @@ app.post("/api/check-license", async (req, res) => {
   }
 });
 
-// Renewal request - notifies Dr. Um via email
 app.post("/api/request-renewal", async (req, res) => {
   const { device_id, email, name } = req.body;
   try {
-    await mailer.sendMail({
-      from: "dugan.um@gmail.com",
+    await resend.emails.send({
+      from: "onboarding@resend.dev",
       to: "dugan.um@gmail.com",
       subject: "[FE Exam App] AI 튜터 갱신 요청",
-      text: `갱신 요청이 들어왔습니다.\n\n이름: ${name || "미입력"}\n이메일: ${email || "미입력"}\n기기 ID: ${device_id}\n\nSupabase에서 만료일을 연장해주세요.\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
+      text: `갱신 요청이 들어왔습니다.\n\n이름: ${name || "미입력"}\n이메일: ${email || "미입력"}\n기기 ID: ${device_id}\n\nSupabase에서 만료일을 연장해주세요:\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
     });
     res.json({ sent: true });
   } catch (err) {
@@ -74,7 +67,6 @@ app.post("/api/request-renewal", async (req, res) => {
   }
 });
 
-// AI Chat
 app.post("/api/chat", async (req, res) => {
   const { messages, system } = req.body;
   if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: "messages array required" });
