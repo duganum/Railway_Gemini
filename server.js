@@ -31,6 +31,13 @@ app.post("/api/register", async (req, res) => {
     const { data, error } = await supabase
       .from("licenses").insert([{ device_id, email: email || null, name: name || null }]).select().single();
     if (error) throw error;
+    // Notify Dr. Um of new registration
+    resend.emails.send({
+      from: "onboarding@resend.dev",
+      to: "dugan.um@gmail.com",
+      subject: "[FE Exam App] 새 사용자 등록",
+      text: `새 사용자가 등록했습니다.\n\n이름: ${name || "미입력"}\n이메일: ${email || "미입력"}\n기기 ID: ${device_id}\n만료일: ${data.expires_at}\n\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
+    }).catch(e => console.error("Registration email error:", e.message));
     res.json({ registered: true, expires_at: data.expires_at, is_active: data.is_active });
   } catch (err) {
     console.error("Register error:", err.message);
