@@ -2,15 +2,18 @@ const express = require("express");
 const cors = require("cors");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { createClient } = require("@supabase/supabase-js");
+const nodemailer = require("nodemailer");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const supabase = createClient(
-  process.env.SUPABASE_URL,
-  process.env.SUPABASE_KEY
-);
+const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+
+const mailer = nodemailer.createTransport({
+  service: "gmail",
+  auth: { user: "dugan.um@gmail.com", pass: process.env.GMAIL_APP_PASSWORD },
+});
 
 app.use(cors());
 app.use(express.json());
@@ -19,7 +22,7 @@ app.get("/", (req, res) => res.json({ status: "Gemini Backend v2" }));
 
 // Register device on first launch
 app.post("/api/register", async (req, res) => {
-  const { device_id, email } = req.body;
+  const { device_id, email, name } = req.body;
   if (!device_id) return res.status(400).json({ error: "device_id required" });
   try {
     const { data: existing } = await supabase
@@ -28,7 +31,7 @@ app.post("/api/register", async (req, res) => {
       return res.json({ registered: true, expires_at: existing.expires_at, is_active: existing.is_active });
     }
     const { data, error } = await supabase
-      .from("licenses").insert([{ device_id, email: email || null }]).select().single();
+      .from("licenses").insert([{ device_id, email: email || null, name: name || null }]).select().single();
     if (error) throw error;
     res.json({ registered: true, expires_at: data.expires_at, is_active: data.is_active });
   } catch (err) {
@@ -50,6 +53,23 @@ app.post("/api/check-license", async (req, res) => {
     res.json({ valid, expires_at: data.expires_at, reason: !data.is_active ? "deactivated" : expired ? "expired" : null });
   } catch (err) {
     console.error("License error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Renewal request - notifies Dr. Um via email
+app.post("/api/request-renewal", async (req, res) => {
+  const { device_id, email, name } = req.body;
+  try {
+    await mailer.sendMail({
+      from: "dugan.um@gmail.com",
+      to: "dugan.um@gmail.com",
+      subject: "[FE Exam App] AI 튜터 갱신 요청",
+      text: `갱신 요청이 들어왔습니다.\n\n이름: ${name || "미입력"}\n이메일: ${email || "미입력"}\n기기 ID: ${device_id}\n\nSupabase에서 만료일을 연장해주세요.\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
+    });
+    res.json({ sent: true });
+  } catch (err) {
+    console.error("Email error:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
