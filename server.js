@@ -25,19 +25,37 @@ app.post("/api/register", async (req, res) => {
   try {
     const { data: existing } = await supabase
       .from("licenses").select("*").eq("device_id", device_id).single();
+
     if (existing) {
+      // Already registered - return existing data
       return res.json({ registered: true, expires_at: existing.expires_at, is_active: existing.is_active });
     }
+
+    // New registration
     const { data, error } = await supabase
       .from("licenses").insert([{ device_id, email: email || null, name: name || null }]).select().single();
     if (error) throw error;
-    // Notify Dr. Um of new registration
+
+    const expiresDate = new Date(data.expires_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+
+    // 1. Send welcome email to USER
+    if (email) {
+      resend.emails.send({
+        from: "onboarding@resend.dev",
+        to: email,
+        subject: "Welcome to FE Exam Prep AI Tutor!",
+        text: `Hi ${name || "there"},\n\nYour FE Exam Prep AI Tutor registration is confirmed!\n\nYour AI Tutor is FREE for 6 months.\nExpires: ${expiresDate}\n\nStart studying now and ace your FE Exam!\n\nBest regards,\nFE Exam Prep Team`,
+      }).catch(e => console.error("User welcome email error:", e.message));
+    }
+
+    // 2. Notify Dr. Um of new registration
     resend.emails.send({
       from: "onboarding@resend.dev",
       to: "dugan.um@gmail.com",
-      subject: "[FE Exam App] 새 사용자 등록",
-      text: `새 사용자가 등록했습니다.\n\n이름: ${name || "미입력"}\n이메일: ${email || "미입력"}\n기기 ID: ${device_id}\n만료일: ${data.expires_at}\n\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
-    }).catch(e => console.error("Registration email error:", e.message));
+      subject: "[FE Exam App] New User Registration",
+      text: `New user registered!\n\nName: ${name || "N/A"}\nEmail: ${email || "N/A"}\nDevice ID: ${device_id}\nExpires: ${data.expires_at}\n\nSupabase:\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
+    }).catch(e => console.error("Admin notification email error:", e.message));
+
     res.json({ registered: true, expires_at: data.expires_at, is_active: data.is_active });
   } catch (err) {
     console.error("Register error:", err.message);
