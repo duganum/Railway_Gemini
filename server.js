@@ -119,4 +119,77 @@ app.post("/api/chat", async (req, res) => {
   }
 });
 
+
+app.post("/api/save-lrs", async (req, res) => {
+  const { device_id, user_name, user_email, app_name, problem_topic, problem_text, message_count, messages } = req.body;
+  if (!device_id) return res.status(400).json({ error: "device_id required" });
+
+  // Only save if at least 2 messages exchanged
+  if (!message_count || message_count < 2) {
+    return res.json({ saved: false, reason: "not_enough_messages" });
+  }
+
+  try {
+    // Generate AI analysis of the learning session
+    let analysis = null;
+    if (messages && messages.length >= 2) {
+      try {
+        const sessionText = messages
+          .filter(m => m.content && m.role)
+          .map(m => `${m.role === "user" ? "Student" : "Tutor"}: ${m.content}`)
+          .join("\n");
+
+        const analysisModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const result = await analysisModel.generateContent(
+          `Analyze this FE Exam tutoring session and provide a brief learning report (3-5 sentences max):
+          - What topic/concept was studied?
+          - Did the student demonstrate understanding?
+          - What was the student's learning progress?
+          - Any areas needing improvement?
+
+          Session:
+          ${sessionText.substring(0, 3000)}`
+        );
+        analysis = result.response.text();
+      } catch (e) {
+        console.error("LRS analysis error:", e.message);
+        analysis = "Analysis unavailable.";
+      }
+    }
+
+    // Save to Supabase
+    const { data, error } = await supabase
+      .from("lrs_reports")
+      .insert([{
+        device_id,
+        user_name: user_name || null,
+        user_email: user_email || null,
+        app_name: app_name || "ME PM",
+        problem_topic: problem_topic || null,
+        problem_text: problem_text || null,
+        message_count: message_count || 0,
+        analysis: analysis || null,
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    // Notify Dr. Um via email
+    if (user_email || user_name) {
+      resend.emails.send({
+        from: "onboarding@resend.dev",
+        to: "dugan.um@gmail.com",
+        subject: `[LRS] ${app_name || "FE Exam"} - ${user_name || "Unknown"} Session Report`,
+        text: `Learning Session Report\n\nStudent: ${user_name || "N/A"}\nEmail: ${user_email || "N/A"}\nApp: ${app_name || "N/A"}\nTopic: ${problem_topic || "N/A"}\nMessages: ${message_count}\n\nAI Analysis:\n${analysis || "N/A"}\n\nView all reports:\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
+      }).catch(e => console.error("LRS email error:", e.message));
+    }
+
+    res.json({ saved: true, id: data.id });
+  } catch (err) {
+    console.error("LRS save error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.listen(PORT, () => console.log("Gemini Backend v2 on port " + PORT));
