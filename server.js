@@ -20,7 +20,7 @@ app.use(express.json());
 app.get("/", (req, res) => res.json({ status: "Gemini Backend v2" }));
 
 app.post("/api/register", async (req, res) => {
-  const { device_id, email, name } = req.body;
+  const { device_id, email, name, app_type } = req.body;
   if (!device_id) return res.status(400).json({ error: "device_id required" });
   try {
     const { data: existing } = await supabase
@@ -33,7 +33,7 @@ app.post("/api/register", async (req, res) => {
 
     // New registration
     const { data, error } = await supabase
-      .from("licenses").insert([{ device_id, email: email || null, name: name || null }]).select().single();
+      .from("licenses").insert([{ device_id, email: email || null, name: name || null, app_type: app_type || null }]).select().single();
     if (error) throw error;
 
     const expiresDate = new Date(data.expires_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
@@ -53,7 +53,7 @@ app.post("/api/register", async (req, res) => {
       from: "onboarding@resend.dev",
       to: "dugan.um@gmail.com",
       subject: "[FE Exam App] New User Registration",
-      text: `New user registered!\n\nName: ${name || "N/A"}\nEmail: ${email || "N/A"}\nDevice ID: ${device_id}\nExpires: ${data.expires_at}\n\nSupabase:\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
+      text: `New user registered!\n\nName: ${name || "N/A"}\nEmail: ${email || "N/A"}\nDevice ID: ${device_id}\nApp: ${app_type || "unknown"}\nExpires: ${data.expires_at}\n\nSupabase:\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
     }).catch(e => console.error("Admin notification email error:", e.message));
 
     res.json({ registered: true, expires_at: data.expires_at, is_active: data.is_active });
