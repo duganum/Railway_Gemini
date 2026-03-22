@@ -33,7 +33,7 @@ app.post("/api/register", async (req, res) => {
 
     // New registration
     const { data, error } = await supabase
-      .from("licenses").insert([{ device_id, email: email || null, name: name || null, app_type: app_type || null }]).select().single();
+      .from("licenses").insert([{ device_id, email: email || null, name: name || null, app_type: app_type || null, expires_at: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString() }]).select().single();
     if (error) throw error;
 
     const expiresDate = new Date(data.expires_at).toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
@@ -44,7 +44,7 @@ app.post("/api/register", async (req, res) => {
         from: "onboarding@resend.dev",
         to: email,
         subject: "Welcome to FE Exam Prep AI Tutor!",
-        text: `Hi ${name || "there"},\n\nYour FE Exam Prep AI Tutor registration is confirmed!\n\nYour AI Tutor is FREE for 6 months.\nExpires: ${expiresDate}\n\nStart studying now and ace your FE Exam!\n\nBest regards,\nFE Exam Prep Team`,
+        text: `Hi ${name || "there"},\n\nYour FE Exam Prep AI Tutor registration is confirmed!\n\nYour AI Tutor is FREE for 3 months.\nExpires: ${expiresDate}\n\nStart studying now and ace your FE Exam!\n\nBest regards,\nFE Exam Prep Team`,
       }).catch(e => console.error("User welcome email error:", e.message));
     }
 
