@@ -67,12 +67,16 @@ app.post("/api/register", async (req, res) => {
 });
 
 app.post("/api/check-license", async (req, res) => {
-  const { device_id } = req.body;
+  const { device_id, app_type } = req.body;
   if (!device_id) return res.status(400).json({ error: "device_id required" });
   try {
     const { data, error } = await supabase
-      .from("licenses").select("expires_at, is_active").eq("device_id", device_id).single();
+      .from("licenses").select("expires_at, is_active, app_type").eq("device_id", device_id).single();
     if (error || !data) return res.json({ valid: false, reason: "not_registered" });
+    // Backfill app_type if missing
+    if (!data.app_type && app_type) {
+      await supabase.from("licenses").update({ app_type }).eq("device_id", device_id);
+    }
     const expired = new Date(data.expires_at) < new Date();
     const valid = data.is_active && !expired;
     res.json({ valid, expires_at: data.expires_at, reason: !data.is_active ? "deactivated" : expired ? "expired" : null });
