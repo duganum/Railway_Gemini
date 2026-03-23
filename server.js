@@ -54,7 +54,7 @@ app.post("/api/register", async (req, res) => {
     // 2. Notify Dr. Um of new registration
     resend.emails.send({
       from: "onboarding@resend.dev",
-      to: "dugan.um@gmail.com",
+      to: "dinast.llc.us@gmail.com",
       subject: "[FE Exam App] New User Registration",
       text: `New user registered!\n\nName: ${name || "N/A"}\nEmail: ${email || "N/A"}\nDevice ID: ${device_id}\nApp: ${app_type || "unknown"}\nExpires: ${data.expires_at}\n\nSupabase:\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
     }).catch(e => console.error("Admin notification email error:", e.message));
@@ -91,7 +91,7 @@ app.post("/api/request-renewal", async (req, res) => {
   try {
     await resend.emails.send({
       from: "onboarding@resend.dev",
-      to: "dugan.um@gmail.com",
+      to: "dinast.llc.us@gmail.com",
       subject: "[FE Exam App] AI 튜터 갱신 요청",
       text: `갱신 요청이 들어왔습니다.\n\n이름: ${name || "미입력"}\n이메일: ${email || "미입력"}\n기기 ID: ${device_id}\n\nSupabase에서 만료일을 연장해주세요:\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
     });
@@ -186,7 +186,7 @@ app.post("/api/save-lrs", async (req, res) => {
     if (user_email || user_name) {
       resend.emails.send({
         from: "onboarding@resend.dev",
-        to: "dugan.um@gmail.com",
+        to: "dinast.llc.us@gmail.com",
         subject: `[LRS] ${app_name || "FE Exam"} - ${user_name || "Unknown"} Session Report`,
         text: `Learning Session Report\n\nStudent: ${user_name || "N/A"}\nEmail: ${user_email || "N/A"}\nApp: ${app_name || "N/A"}\nTopic: ${problem_topic || "N/A"}\nMessages: ${message_count}\n\nAI Analysis:\n${analysis || "N/A"}\n\nView all reports:\nhttps://supabase.com/dashboard/project/nzljmlimmlewefuhqmhg/editor`,
       }).catch(e => console.error("LRS email error:", e.message));
