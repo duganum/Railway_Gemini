@@ -27,7 +27,10 @@ app.post("/api/register", async (req, res) => {
       .from("licenses").select("*").eq("device_id", device_id).single();
 
     if (existing) {
-      // Already registered - return existing data
+      // Already registered - update app_type if missing
+      if (!existing.app_type && app_type) {
+        await supabase.from("licenses").update({ app_type }).eq("device_id", device_id);
+      }
       return res.json({ registered: true, expires_at: existing.expires_at, is_active: existing.is_active });
     }
 
