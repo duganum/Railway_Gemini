@@ -116,7 +116,7 @@ app.post("/api/chat", async (req, res) => {
     const systemPrompt = ME_FE_SYSTEM_PROMPT +
       (system ? `\n\nCurrent Problem Context:\n${system}` : "");
     const modelInstance = genAI.getGenerativeModel({
-      model: "gemini-2.0-flash",
+      model: "gemini-3.8-flash",
       systemInstruction: systemPrompt,
     });
     const history = messages.slice(0, -1).map(m => ({
@@ -152,7 +152,7 @@ app.post("/api/save-lrs", async (req, res) => {
           .map(m => `${m.role === "user" ? "Student" : "Tutor"}: ${m.content}`)
           .join("\n");
 
-        const analysisModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+        const analysisModel = genAI.getGenerativeModel({ model: "gemini-3.8-flash" });
         const result = await analysisModel.generateContent(
           `Analyze this FE Exam tutoring session and provide a brief learning report (3-5 sentences max):
           - What topic/concept was studied?
