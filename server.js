@@ -92,6 +92,31 @@ app.post("/api/check-license", async (req, res) => {
   }
 });
 
+app.post("/api/send-access-code", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: "email required" });
+  try {
+    // Send passcode to user
+    await resend.emails.send({
+      from: "onboarding@resend.dev",
+      to: email,
+      subject: "Your CE FE Exam Access Code",
+      text: `Your access code for CE FE Exam is: 1753\n\nEnter this code on the website to unlock your access.\n\nDugan Engineering Tutor`,
+    });
+    // Notify Dr. Um
+    await resend.emails.send({
+      from: "onboarding@resend.dev",
+      to: "dugan.um@gmail.com",
+      subject: "CE FE EXAM Registration",
+      text: `New registration request:\n\nEmail: ${email}\nTime: ${new Date().toISOString()}`,
+    });
+    res.json({ sent: true });
+  } catch (err) {
+    console.error("send-access-code error:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post("/api/request-renewal", async (req, res) => {
   const { device_id, email, name } = req.body;
   try {
