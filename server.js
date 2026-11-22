@@ -96,24 +96,70 @@ app.post("/api/send-access-code", async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: "email required" });
   try {
-    // Send passcode to user
+    // Check if this email already has a code
+    const { data: existing } = await supabase
+      .from("licenses")
+      .select("name")
+      .eq("email", email)
+      .eq("app_type", "ce_fe_access")
+      .single();
+
+    let code;
+    if (existing) {
+      // Reuse existing code for returning users
+      code = existing.name;
+    } else {
+      // Generate new 6-digit code
+      code = Math.floor(100000 + Math.random() * 900000).toString();
+      await supabase.from("licenses").insert([{
+        device_id: `ce_fe_${Date.now()}`,
+        email,
+        name: code,
+        app_type: "ce_fe_access",
+        is_active: true,
+        expires_at: new Date("2099-01-01").toISOString(),
+      }]);
+    }
+
+    // Send code to user
     await resend.emails.send({
       from: "onboarding@resend.dev",
       to: email,
       subject: "Your CE FE Exam Access Code",
-      text: `Your access code for CE FE Exam is: 1753\n\nEnter this code on the website to unlock your access.\n\nDugan Engineering Tutor`,
+      text: `Your access code for CE FE Exam is: ${code}\n\nEnter this code on the website to unlock your access.\n\nDugan Engineering Tutor`,
     });
     // Notify Dr. Um
     await resend.emails.send({
       from: "onboarding@resend.dev",
       to: "dugan.um@gmail.com",
       subject: "CE FE EXAM Registration",
-      text: `New registration request:\n\nEmail: ${email}\nTime: ${new Date().toISOString()}`,
+      text: `New registration:\n\nEmail: ${email}\nCode: ${code}\nTime: ${new Date().toISOString()}`,
     });
     res.json({ sent: true });
   } catch (err) {
     console.error("send-access-code error:", err.message);
     res.status(500).json({ error: err.message });
+  }
+});
+
+app.post("/api/verify-access-code", async (req, res) => {
+  const { email, code } = req.body;
+  if (!email || !code) return res.status(400).json({ valid: false });
+  try {
+    const { data } = await supabase
+      .from("licenses")
+      .select("name")
+      .eq("email", email)
+      .eq("app_type", "ce_fe_access")
+      .single();
+    if (data && data.name === code) {
+      res.json({ valid: true });
+    } else {
+      res.json({ valid: false });
+    }
+  } catch (err) {
+    console.error("verify-access-code error:", err.message);
+    res.status(500).json({ valid: false });
   }
 });
 
