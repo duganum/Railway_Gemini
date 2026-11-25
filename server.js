@@ -19,7 +19,7 @@ const ME_FE_SYSTEM_PROMPT = "You are an expert Mechanical Engineering FE exam tu
 app.use(cors());
 app.use((req, res, next) => {
   if (req.originalUrl === "/api/stripe-webhook") return next();
-  express.json()(req, res, next);
+  express.json({ limit: "64kb" })(req, res, next);
 });
 
 app.get("/", (req, res) => res.json({ status: "Gemini Backend v2" }));
@@ -179,9 +179,31 @@ app.post("/api/request-renewal", async (req, res) => {
   }
 });
 
+// Input size limits
+const MAX_MESSAGE_CHARS  = 3000;   // per individual message
+const MAX_HISTORY_CHARS  = 20000;  // total across all messages
+const MAX_MESSAGE_COUNT  = 40;     // number of messages in history
+const MAX_SYSTEM_CHARS   = 2000;   // system/problem context field
+
 app.post("/api/chat", async (req, res) => {
   const { messages, system } = req.body;
   if (!messages || !Array.isArray(messages)) return res.status(400).json({ error: "messages array required" });
+
+  // ── Input size checks ──
+  if (messages.length > MAX_MESSAGE_COUNT)
+    return res.status(400).json({ error: `Too many messages (max ${MAX_MESSAGE_COUNT}).` });
+
+  const oversized = messages.find(m => typeof m.content === "string" && m.content.length > MAX_MESSAGE_CHARS);
+  if (oversized)
+    return res.status(400).json({ error: `Message too long. Please keep each input under ${MAX_MESSAGE_CHARS} characters.` });
+
+  const totalChars = messages.reduce((sum, m) => sum + (typeof m.content === "string" ? m.content.length : 0), 0);
+  if (totalChars > MAX_HISTORY_CHARS)
+    return res.status(400).json({ error: `Conversation history too large. Please start a new session.` });
+
+  if (system && typeof system === "string" && system.length > MAX_SYSTEM_CHARS)
+    return res.status(400).json({ error: `System context too long (max ${MAX_SYSTEM_CHARS} characters).` });
+
   try {
     // Use handbook-enhanced system prompt (Gemini 2.0 Flash auto-caches repeated prefix)
     const systemPrompt = ME_FE_SYSTEM_PROMPT +
