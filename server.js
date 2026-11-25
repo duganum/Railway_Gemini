@@ -180,7 +180,7 @@ app.post("/api/request-renewal", async (req, res) => {
 });
 
 // Input size limits
-const MAX_MESSAGE_CHARS  = 3000;   // per individual message
+const MAX_MESSAGE_CHARS  = 500;    // per individual message
 const MAX_HISTORY_CHARS  = 20000;  // total across all messages
 const MAX_MESSAGE_COUNT  = 40;     // number of messages in history
 const MAX_SYSTEM_CHARS   = 2000;   // system/problem context field
